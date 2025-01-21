@@ -123,8 +123,6 @@ k * x
 # 3) Use the combine function to create one more vector, `d` that consists of any three elements from `w` and any four elements of `k`.
 d = c(sample(w, size=3), sample(k, size=4))
 d
-
-
 ```
 
 ### Summary Statistics of Vectors
@@ -133,18 +131,13 @@ In the R-code chunk below, calculate the **summary statistics** (i.e., maximum, 
 
 ```{r}
 v <- c(16.4, 16.0, 10.1, 16.8, 20.5, NA, 20.2, 13.1, 24.8, 20.2, 25.0, 20.5, 30.5, 31.4, 27.1)
-
-
-
-
-
-
-
-
-
-
-
-
+paste0("maximum:", max(v, na.rm = TRUE))
+paste0("minimum:", min(v, na.rm = TRUE))
+paste0("sum:", sum(v, na.rm = TRUE))
+paste0("mean:", mean(v, na.rm = TRUE))
+paste0("median:", median(v, na.rm = TRUE))
+paste0("variance:", var(v, na.rm = TRUE))
+paste0("std:", sd(v, na.rm = TRUE))
 
 ```
 
@@ -157,10 +150,14 @@ Make the mean of the first column equal to 8 with a standard deviation of 2 and 
 
 ```{r}
 
-
-
-
-
+# Approach 1
+c1 = rnorm(n=5, mean=8, sd=2)
+c2 = rnorm(n=5, mean=25, sd=10)
+m1 = cbind(c1, c2)
+m1
+# Approach 2
+m2 = matrix(c(c1, c2), nrow = 5, ncol = 2)
+m2
 ```
 
 ***Question 1***: What does the `rnorm` function do? 
@@ -168,6 +165,7 @@ What do the arguments in this function specify?
 Remember to use `help()` or type `?rnorm`.
 
 > Answer 1:
+> This function generates a vector or a matrix of random number drawn from the normal distribution with specified mean and standard deviation.
 
 
 In the R code chunk below, do the following: 
@@ -176,8 +174,14 @@ In the R code chunk below, do the following:
 3) Determine the dimensions of the transposed matrix.
 
 ```{r}
+# load data
+m = read.table(paste0(getwd(), "/Week1-RStudio/data/matrix.txt"))
 
+# transpose
+t(m)
 
+# check dimension
+dim(t(m))
 
 ```
 
@@ -185,7 +189,7 @@ In the R code chunk below, do the following:
 ***Question 2***: What are the dimensions of the matrix you just transposed?
 
 > Answer 2:
-
+The matrix has 10 rows and 5 columns originally (before transposition).
 
 ###Indexing a Matrix
 
@@ -194,7 +198,12 @@ In the R code chunk below, do the following:
 2) Remove the last row of matrix `m`.
 
 ```{r}
-
+# rename everything but the third col
+colnames(m)[c(1, 2, 4, 5)] = c("N1", "N2", "N4", "N5")
+m
+# remove last row
+m_new = m[-c(dim(m)),]
+m_new
 
 ```
 
@@ -206,8 +215,9 @@ In the R code chunk below, do the following:
 2) Display the structure of this data set.
 
 ```{r}
-
-
+zoop = read.table(paste0(getwd(), "/Week1-RStudio/data/zoop_nuts.txt"), header = TRUE)
+df_zoop = as.data.frame(zoop)
+summary(df_zoop)
 ```
 
 ### Correlation
@@ -219,7 +229,7 @@ In the R-code chunk below, do the following:
 
 ```{r}
 
-
+meso
 ```
 
 
@@ -256,7 +266,6 @@ In the R code chunk below, do the following:
 3) Produce a plot of this regression analysis including the following: categorically labeled points, the predicted regression line with 95% confidence intervals, and the appropriate axis labels.
 
 ```{r}
-
 
 
 
