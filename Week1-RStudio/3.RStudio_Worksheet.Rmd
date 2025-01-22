@@ -52,7 +52,7 @@ In the R code chunk below, please provide the code to:
 rm(list = ls()) # clear working directory
 
 print(getwd()) # print current working directory
-
+setwd(getwd())
 # setwd("./3.RStudio") # set current workind to #3.RStudio
 
 ```
@@ -83,7 +83,6 @@ paste0("Length of the opposite side of right triangle", theta * h_length)
 
 # Q4
 paste0("Natural log of 1", log(1))
-
 
 ```
 
@@ -175,7 +174,7 @@ In the R code chunk below, do the following:
 
 ```{r}
 # load data
-m = read.table(paste0(getwd(), "/Week1-RStudio/data/matrix.txt"))
+m = read.table(paste0(getwd(), "/data/matrix.txt"))
 
 # transpose
 t(m)
@@ -215,9 +214,10 @@ In the R code chunk below, do the following:
 2) Display the structure of this data set.
 
 ```{r}
-zoop = read.table(paste0(getwd(), "/Week1-RStudio/data/zoop_nuts.txt"), header = TRUE)
-df_zoop = as.data.frame(zoop)
+meso = read.table(paste0(getwd(), "/data/zoop_nuts.txt"), sep="\t", header = TRUE)
+df_zoop = as.data.frame(meso)
 summary(df_zoop)
+str(meso)
 ```
 
 ### Correlation
@@ -228,14 +228,23 @@ In the R-code chunk below, do the following:
 3) Conduct a simple **Pearson's correlation** analysis.
 
 ```{r}
+meso.num = meso[, 3:8]
+# 2. Pairwise bi plots
+pairs(meso.num)
 
-meso
+# 3. Pearson's corr
+cor1 = cor(meso.num)
+cor1
 ```
 
 
 ***Question 3***: Describe some of the general features based on the visualization and correlation analysis above?
 
 > Answer 3:
+> Based on the pairwise plots and the Pearson correlation matrix, we see:
+> Highly Correlated Variables: Variables with high positive correlations (e.g., TN and TIN, corr=0.96) show nearly diagonal patterns in their scatter plots.
+> Low Correlation: Variables with low correlation (corr ~ 0) no discernible trends in their scatter plots, appearing scattered randomly.
+> Negative Correlation: Variables with negative correlations (e.g., SRP vs CHLA) exhibit a slight downward slope in their scatter plots.
 
 
 In the R code chunk below, do the following:
@@ -245,8 +254,17 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+# install.packages("psych")
+require(psych)
+cor2 = corr.test(meso.num, method = "pearson")
+print(cor2, digits=3)
 
+cor3 = corr.test(meso.num, method = "kendall", adjust = "BH")
+print(cor3, digits=3)
 
+# install.packages("corrplot")
+require(corrplot)
+corrplot(cor1, method="ellipse")
 ```
 
 ***Question 4***: 
@@ -257,6 +275,15 @@ With the Pearson's method, is there evidence for false discovery rate due to mul
 Why is false discovery rate important?
 
 > Answer 4: 
+> From the reference of RDocumentation, corr.test uses the cor function to find the correlations, and then applies a t-test to the individual correlations.
+> The results of the outputs are sensitive to the method used (parametric vs. non-parametric). 
+> Parametric methods assume that the data are normally distributed and measure linear relationships. 
+> Non-parametric methods (e.g., Spearman’s correlation) do not assume normality and are more robust for non-linear relationships or data with outliers.
+> One should use non-parametric methods when the data are not normally distributed or when the relationship between variables is not linear.
+> With the Pearson's method, there is evidence for false discovery rate due to multiple comparisons. 
+> The corr.test function adjusts for this using methods using BH correction. 
+p-values are significant before adjustment but become non-significant after FDR correction, it indicates evidence of a false discovery rate due to multiple testing.
+> **False discovery rate** is important because it helps to control the proportion of false positives (Type I errors) when multiple hypothesis tests are conducted simultaneously.
 
 ### Linear Regression
 
@@ -266,17 +293,45 @@ In the R code chunk below, do the following:
 3) Produce a plot of this regression analysis including the following: categorically labeled points, the predicted regression line with 95% confidence intervals, and the appropriate axis labels.
 
 ```{r}
+# Linear regression
+fitreg = lm(ZP ~ TN, data=meso)
+summary(fitreg)
 
+# Plot 
 
+# scatter plot
+plot(meso$TN, meso$ZP, 
+ylim=c(0, 10), 
+xlim=c(500, 5000), 
+xlab="Total Nitrogen (µg/L)",
+ylab="Zooplankton Biomass (µg/L)", las=1)
 
+# Add point labels
+text(meso$TN, meso$ZP, labels=meso$NUTS, pos=3, cex=0.8)
 
+# create variables for x-axis
+newTN = seq(min(meso$TN), max(meso$TN), length.out=10)
 
+# predict values of the variables
+regline = predict(fitreg, newdata=data.frame(TN=newTN)
 
+# Make a line that map the values with the regressed line
+lines(newTN, regline[,1], lwd=2, col="blue")
+
+# Add confidence intervals
+conf95 = predict(fitreg, newdata=data.frame(TN=newTN), 
+    interval="confidence", level=0.95, type="response")
+# print(conf95)
+matlines(newTN, conf95[,c("lwr", "upr")], type="l", lty=2, lwd=1, col="black")
 ```
 
 ***Question 5***: Interpret the results from the regression model
 
 > Answer 5:
+> There is a significant positive relationship between total nitrogen (TN) and zooplankton biomass (ZP) (p < 0.05).
+> Also, the model explains 55% of the variance in zooplankton biomass (adjusted R^2 = 0.55).
+> I believe that this relationship is not entirely accurate. If we split data by nutrient *NUTS* variable, there hardly any trend between TN and ZP.
+
 
 
 ```{r}
@@ -293,19 +348,70 @@ Using the R code chunk below, do the following:
 
 
 ```{r}
+NUTS = factor(meso$NUTS, levels=c("L", "M", "H"))
+# calculate the mean of zooplancton biomass in each nutrient treatment
+zp.means = tapply(meso$ZP, NUTS, mean)
 
+# Function to calculate the sd removing the NA values
+sem = function(x) {
+  sd(na.omit(x)/sqrt(length(na.omit(x))))
+}
 
+# calculate the standard error 
+zp.sem = tapply(meso$ZP, NUTS, sem)
 
+bp = barplot(zp.means, ylim=c(0, round(max(meso$ZP), digits=0)),
+  pch=15, cex=1.25, las=1, cex.lab=1.4, cex.axis=1.25,
+  xlab="Nutrient Supply", ylab="Zooplankton Biomass (µg/L)",
+  names.arg=c("Low", "Medium", "High"))
 
+# Add error bars
+arrows(x0=bp, y0=zp.means-zp.sem, 
+      x1=bp, y1=zp.means+zp.sem, angle=90, code=3, length=0.1)
 
+# ANOVA
+anova1 = aov(ZP ~ NUTS, data=meso)
+summary(anova1)
 
+# Tukey's HSD test
+TukeyHSD(anova1)
 
+# Plot the residuals of the ANOVA
+par(mfrow=c(2,2), mar=c(5.1, 4.1, 4.1, 2.1))
+plot(anova1)
 ```
 
 ## SYNTHESIS: SITE-BY-SPECIES MATRIX
 
 In the R code chunk below, load the zoops.txt data set in your **3.RStudio** data folder.
+
+```{r}
+# load data
+zoops = read.table(paste0(getwd(), "/data/zoops.txt"), sep="\t", header = TRUE)
+str(zoops)
+# based on the outputs of str, we see that the data is a data frame with 24 variables and 11 variables ( columns).
+
+# Check number of unique tanks ( sites)
+print(paste("Number of unique tanks:", length(unique(zoops$TANK))))
+
+
+```
 Create a site-by-species matrix (or dataframe) that does *not* include TANK or NUTS.
+> Answer:
+> I'm not sure whether site-by-species matrix means a presence/absence matrix or a matrix with biomass values, so I will create both.
+
+```{r}
+# Now create a site-by-species matrix : 
+# Set 'TANK' as the row names and remove it as a column
+row.names(zoops) <- zoops$TANK
+zoops = zoops[, !(names(zoops) %in% c("TANK", "NUTS"))]
+zoops
+
+# Presence / Absence matrix
+zoops[zoops > 0] = 1
+zoops
+```
+
 The remaining columns of data refer to the biomass (µg/L) of different zooplankton taxa: 
   
   + CAL = calanoid copepods
