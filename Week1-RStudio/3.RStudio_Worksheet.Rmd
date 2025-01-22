@@ -1,6 +1,6 @@
 ---
 title: '3\. Worksheet: Basic R'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Trang Nguyen; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -70,19 +70,19 @@ Feel free to reference the **1. Introduction to version control and computing to
 ```{r}
 # Q1
 l = 5
-paste0("Volume of the cube", l ^ 3)
+paste0("Volume of the cube:", l ^ 3)
 
 # Q2 
 r = 2
-paste0("Area of the circle ", pi * r ^ 2)
+paste0("Area of the circle:", pi * r ^ 2)
 
 # Q3 
 h_length = sqrt(2)
 theta = pi / 4
-paste0("Length of the opposite side of right triangle", theta * h_length)
+paste0("Length of the opposite side of right triangle:", theta * h_length)
 
 # Q4
-paste0("Natural log of 1", log(1))
+paste0("Natural log of 1 is", log(1))
 
 ```
 
@@ -301,10 +301,10 @@ summary(fitreg)
 
 # scatter plot
 plot(meso$TN, meso$ZP, 
-ylim=c(0, 10), 
-xlim=c(500, 5000), 
-xlab="Total Nitrogen (µg/L)",
-ylab="Zooplankton Biomass (µg/L)", las=1)
+  ylim=c(0, 10), 
+  xlim=c(500, 5000), 
+  xlab="Total Nitrogen (µg/L)",
+  ylab="Zooplankton Biomass (µg/L)", las=1)
 
 # Add point labels
 text(meso$TN, meso$ZP, labels=meso$NUTS, pos=3, cex=0.8)
@@ -313,10 +313,11 @@ text(meso$TN, meso$ZP, labels=meso$NUTS, pos=3, cex=0.8)
 newTN = seq(min(meso$TN), max(meso$TN), length.out=10)
 
 # predict values of the variables
-regline = predict(fitreg, newdata=data.frame(TN=newTN)
+regline = predict(fitreg, newdata=data.frame(TN=newTN))
+
 
 # Make a line that map the values with the regressed line
-lines(newTN, regline[,1], lwd=2, col="blue")
+lines(newTN, regline, lwd=2, col="blue")
 
 # Add confidence intervals
 conf95 = predict(fitreg, newdata=data.frame(TN=newTN), 
@@ -402,14 +403,16 @@ Create a site-by-species matrix (or dataframe) that does *not* include TANK or N
 
 ```{r}
 # Now create a site-by-species matrix : 
-# Set 'TANK' as the row names and remove it as a column
+# Set 'TANK' as the row names and remove it as a column (after checking that there are exactly 24 tanks)
 row.names(zoops) <- zoops$TANK
-zoops = zoops[, !(names(zoops) %in% c("TANK", "NUTS"))]
-zoops
+zoops.site_by_species = zoops[, !(names(zoops) %in% c("TANK", "NUTS"))]
+zoops.site_by_species
 
-# Presence / Absence matrix
-zoops[zoops > 0] = 1
-zoops
+# Presence / Absence matrix 
+zoops.binary = zoops.site_by_species
+zoops.binary[zoops.binary  > 0] = 1
+zoops.binary 
+
 ```
 
 The remaining columns of data refer to the biomass (µg/L) of different zooplankton taxa: 
@@ -435,14 +438,75 @@ The remaining columns of data refer to the biomass (µg/L) of different zooplank
 ***Question 6***: With the visualization and statistical tools that we learned about in the **3. RStudio** handout, use the site-by-species matrix to assess whether and how different zooplankton taxa were responsible for the total biomass (ZP) response to nutrient enrichment. 
 Describe what you learned below in the "Answer" section and include appropriate code in the R chunk.
 
+> Pre-Answer:
+> Here is how I understood the question and how I solve the question
+> Previously, through ANOVA, we saw how different nutrient enrichments influence the total biomass, but we didnt take into account the fact that each tank has different taxa distribution.
+> In this question, we want to know how each taxa contribute to the total biomass
+
 ```{r}
+# First, let's calculate the total biomass for each tank
+zoops$Total_Biomass = rowSums(zoops[, !(names(zoops) %in% c("TANK", "NUTS"))])
+
+# Order category : Low, Med, High nutrient level
+zoops$NUTS = factor(zoops$NUTS, levels=c("L", "M", "H"))
+
+# Summarize the data to check differences in Total_Biomass by nutrient levels 
+# We did this for zoop_nuts but instead of aggregate, we did anova
+aggregate(Total_Biomass ~ NUTS, data = zoops, summary)
 
 
+# Now, I create a boxplot of total biomass by nutrient level
+boxplot(Total_Biomass ~ NUTS, data = zoops, 
+        main = "Total Biomass (ZP) by Nutrient Levels", 
+        xlab = "Nutrient Level (NUTS)", 
+        ylab = "Total Biomass (µg/L)", 
+        col = "lightblue")
+
+# We get what we expected to see, higher nutrient level means higher total biomass.
+# -----------------------------------------------------------------------------------
+
+# Now I'll subset the matrix to include only biomass data of taxa
+zoops_taxa <- zoops[, !(names(zoops) %in% c("NUTS", "TANKS", "Total_Biomass"))]
+
+# Transpose the data for stacked barplot (taxa as rows) - visually, it gives us an intuition
+taxa_matrix <- t(as.matrix(zoops_taxa))
+
+# Colors for taxa
+taxa_colors <- rainbow(nrow(taxa_matrix))  # Generate unique colors for each taxon
+
+# Create the stacked bar plot
+barplot(
+  taxa_matrix,
+  beside = FALSE,                     # Stacked bars
+  col = taxa_colors,                  # Colors for each taxon
+  legend.text = rownames(taxa_matrix),# Add legend for taxa
+  args.legend = list(x = "topright"), # Legend position
+  xlab = "Sites",                     # X-axis label
+  ylab = "Biomass (µg/L)",            # Y-axis label
+  main = "Contribution of Zooplankton Taxa to Total Biomass"
+)
+
+## Now, I tackle the question : what is the contribution of each species to the total biomass
+# ANOVA to test if total biomass differs by nutrient level
+zp_anova <- aov(Total_Biomass ~ NUTS, data = zoops) # copied from previous dataset meso
+summary(zp_anova)
+
+# The output shows that the total biomass significantly differs by nutrient level (p < 0.05).
+# Linear regression to determine how each taxa contributes to total biomass
+lm_model <- lm(Total_Biomass ~ CAL + DIAP + CYCL + BOSM + SIMO + CERI + NAUP + DLUM + CHYD, data = zoops)
+summary(lm_model)
 
 
 ```
 
-## SUBMITTING YOUR WORKSHEET
+> Answer :
+> For the ANOVA model of effect of nutrient enrichment on total biomass. The p-value of F test is 0.000373 < 0.05, meaning that nutrient levels (NUTS) significantly affect total biomass.
+>
+> For the linear regression model of different taxa on total biomass: if we look at the intercept, which is the fixed effect contribution beyond the taxa. The p-value is 0.482, so not significant. 
+> Then, when we look and the coefficients of all taxa, we see that all of them have coefficients around 1, which means that their biomass contributes equally and linearly, and all the coefficients are significant.
+> Finally, if we look at the explanatory power of this current model: we can see that R square is 1.0, which means that the model perfectly explains the total biomass, this was accompagnied with a low p value of F stats, which indicates that the model is significant. 
+
+
 Use Knitr to create a PDF of your completed **3.RStudio_Worksheet.Rmd** document, push the repo to GitHub, and create a pull request.
 Please make sure your updated repo include both the PDF and RMarkdown files.
 
