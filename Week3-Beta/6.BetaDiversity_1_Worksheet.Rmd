@@ -1,6 +1,6 @@
 ---
 title: '6\. Worksheet: Among Site (Beta) Diversity -- Part 1'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Trang Nguyen; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -49,10 +49,19 @@ In the R code chunk below, please provide the code to:
 4) Load the `vegan` R package (be sure to install first if you have not already).
 
 ```{r}
+# Clear the environment
+rm(list = ls())
+getwd()
+setwd(getwd() + "/Week3-Beta/")
+# library(vegan)
 
-
-
-
+package.list = c("ade4", "vegan", "viridis", "gplots", "BiodiversityR", "indicspecies")
+for (package in package.list) {
+  if (!require(package, character.only = TRUE, quietly = TRUE)) {
+    install.packages(package, dependencies = TRUE)
+    library(package, character.only = TRUE)
+  }
+}
 ```
 
 ## 2) LOADING DATA
@@ -64,20 +73,25 @@ In the R code chunk below, do the following:
 
 ```{r}
 # note, please do not print the dataset when submitting
-
-
-
+# install.packages("ade4")
+library(ade4)
+data(doubs)
+# summary(doubs)
+# dim(doubs$fish)
+dim(doubs$sites)
+# summary(doubs$xy)
+# doubs$xy
 ```
 
 ***Question 1***:  Describe some of the attributes of the `doubs` dataset.  
 
 a.  How many objects are in `doubs`?
 b.  How many fish species are there in the `doubs` dataset?
-c.  How many sites are in the `doubs` dataset?
+c.  How many sites are in the `doubs` dataset? 
 
-> ***Answer 1a***:  
-> ***Answer 1b***:  
-> ***Answer 1c***:  
+> ***Answer 1a***: There are 4 objects in the `doubs` dataset. They are `env`, `fish`, `xy`, `species`
+> ***Answer 1b***: There are 27 fish species in the `doubs` dataset.
+> ***Answer 1c***: There are 30 sites in the `doubs` dataset. (30 rows in `doubs$xy`)
 
 ### Visualizing the Doubs River Dataset
 
@@ -87,10 +101,40 @@ a.  How does fish richness vary along the sampled reach of the Doubs River?
 b.  How does Brown Trout (*Salmo trutta*) abundance vary along the sampled reach of the Doubs River?
 c.  What do these patterns say about the limitations of using richness when examining patterns of biodiversity?
 
-> ***Answer 2a***:  
-> ***Answer 2b***:  
-> ***Answer 2c***:  
+```{r}
+# Observed richness
+specnumber(doubs$fish)
+```
 
+> ***Answer 2a***: We can see that there is a big difference between species richness between sites. For instant, sites 27->30 have more than 20 different kinds of fishes (similar to site 17 -> 22). While other sites have very few species.
+> Site 8 does not have any fishes.
+
+> ***Answer 2b***:  The Brown Trout is most abundant for some sites (up to 5 encountered). While for some other sites, the Brown Trout is almost absent. 
+```{r}
+# 2b
+doubs$fish$Satr
+```
+> I will also plot out the distribution of Brown Trout accross sites
+```{r}
+# Plot doubs$fish$Satr over x, y coordinates
+plot(x=doubs$xy$x,
+    y=doubs$xy$y,
+    xlab="X coordinates in km",
+    ylab="Y-coordinates in km",
+    col=sort(unique(doubs$fish$Satr)),
+    main="Brown Trout abundance in the Doubs River",
+    pch=19, 
+    cex=5,
+    # add number of sites to the dots,
+    labels=doubs$sites$Site)
+
+legend("topright", legend=unique(doubs$fish$Satr), col=sort(unique(doubs$fish$Satr)), pch=19)
+# Background grid
+grid()
+
+```
+> ***Answer 2c***:  
+> There is a difference between species richness and the abundance of a specific species in accross datasets. 
 ## 3) QUANTIFYING BETA-DIVERSITY
 
 In the R code chunk below, do the following:  
