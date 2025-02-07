@@ -52,7 +52,7 @@ In the R code chunk below, please provide the code to:
 # Clear the environment
 rm(list = ls())
 getwd()
-# setwd("Week3-Beta/")
+setwd("./Week3-Beta/")
 # library(vegan))
 
 package.list = c("ade4", "vegan", "viridis", "gplots", "BiodiversityR", "indicspecies")
@@ -491,7 +491,7 @@ plot(data.pcoa$points[ ,1],
   data.pcoa$points[ ,2], 
      xlab = "PCoA 1",
      ylab = "PCoA 2",
-     pch = 16, cex = 0.5,  type = "n", cex.lab = 1.5, 
+     pch = 16, cex = 2,  type = "n", cex.lab = 1.5, 
      cex.axis = 0.5, axes = FALSE)
 
 # # Add Axes
@@ -503,7 +503,7 @@ box(lwd = 2)
 # # Add Points & Labels
 points(data.pcoa$points[ ,1], 
   data.pcoa$points[ ,2],
-  pch = 19, cex = 2, bg = "gray", col = "gray")
+  pch = 19, cex = 3, bg = "gray", col = "gray")
 text(data.pcoa$points[ ,1], data.pcoa$points[ ,2], 
      labels = row.names(data.pcoa$points))
   
@@ -523,23 +523,25 @@ text(
   data.pcoa$cproj[ ,1], 
   data.pcoa$cproj[ ,2], 
   labels = row.names(data.pcoa$cproj), col = "red",
-  cex=0.5)
+  cex=1)
 
 ```
 
 > ***Answer***
 > ***Cluster Analysis***
+> 
 > We see that some sites cluster consistently by location over different years. For example, site 1 contains all the years sampled, this suggests that the zoobenthos community composition is stable over time. 
 > Howeverm some other sites (0 and 2) have some temporal shifts. For instance, site 0_1995 and 0_2002 are clustered closer to sites 2_1994 2_1995, 2_2000, suggesting that there might be environmental changes, disturbances, or shifts in the zoobenthos community composition over time.
+>
 > ***Bray_Curtis Distance Heatmap***
 > We can see shows distinct blocks of similarity between the same site being sampled over years. This was expected. However, we find again that in the early years of site 2 samples (1994,95), site 2 had a zoobenthos biodiversity composition more similar to site 0 of the same year. 
 > In conclusion, for sites that show changes over time, we can think that they are locaed in more disturbed areas or are more exposed to environmental changes (pollutionm climate changes, invasive species?)
+>
 > ***PCOA analysis***
 > Here, we see that the sites 0, 1, 2 parated across the PCoA space, suggesting they have distinct community compositions.
 Site 1 (e.g., 1_1994, 1_1995, 1_1999, etc.) appears to form a tight cluster, which means that they have a relatively stable species composition over time.
 > Sites 2 and 0(e.g., 2_1994, 2_1995, etc.) are more dispersed across multiple quadrants. This suggests that "these sites" have bigger variation in community composition.
-
-
+>
 > I think species nearer to the center are more present in most sites. While species far from the origin are more specialized or strongly associated with particular site conditions.
 > There are several patterns : 
 > Macoma balthica is strongly associated with site 1. This suggest that this species may adapt well in this site' specific condition. 
