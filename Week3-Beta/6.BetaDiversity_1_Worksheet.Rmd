@@ -2,8 +2,8 @@
 title: '6\. Worksheet: Among Site (Beta) Diversity -- Part 1'
 author: "Trang Nguyen; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: pdf_document
-geometry: margin=2.54cm
+output:
+  html_document: default
 ---
 
 ## OVERVIEW
@@ -52,7 +52,7 @@ In the R code chunk below, please provide the code to:
 # Clear the environment
 rm(list = ls())
 getwd()
-setwd("./Week3-Beta/")
+setwd(getwd())
 # library(vegan))
 
 package.list = c("ade4", "vegan", "viridis", "gplots", "BiodiversityR", "indicspecies")

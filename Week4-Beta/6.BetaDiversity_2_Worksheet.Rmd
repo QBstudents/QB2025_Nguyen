@@ -1,6 +1,6 @@
 ---
 title: '6\. Worksheet: Among Site (Beta) Diversity -- Part 2'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Trang Nguyen; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -42,9 +42,9 @@ In the R code chunk below, provide the code to:
 4. load the `vegan` R package (be sure to install if needed).  
 
 ```{r}
-
-
-
+rm(list = ls())
+getwd()
+setwd(getwd())
 
 ```
 
@@ -54,12 +54,10 @@ In the R code chunk below, load the `doubs` dataset from the `ade4` package
 
 ```{r}
 # note, pleae do not print the dataset when submitting
-
-
-
+library(ade4)
+data(doubs)
 ```
 ## 3) HYPOTHESIS TESTING
-
 ### A.  Multivariate Procedures for Categorical Designs
 Earlier work done in the Doubs River suggested that the river has four distinct regions of habitat quality: the first region (sites 1-14) of "high quality"; the second (sites 15 - 19) and fourth (sites 26 - 30) of "moderate quality"; and the third  (sites 20 - 25) of "low quality".
 
@@ -69,22 +67,48 @@ In the code chunk below, test the hypothesis that fish community composition var
 2. use the multivariate analyses for categorical predictors to describe how fish community structure relates to habitat quality.
 
 ```{r}
+library(vegan)
+library(indicspecies)
+# Subset the fish data
+fish = doubs$fish
+fish = fish[-8, ]
+# 1. doubs
+quality = c(rep("HQ", 13), 
+    rep("MQ", 5), rep("LQ", 6),
+    rep("MQ", 5))
 
+# Run PERMANOVA
+adonis2(fish ~ quality, method="bray", permutations=999)
 
+## IndVal matrix
+indval = multipatt(fish, cluster=quality, 
+ func = "IndVal.g",
+ control = how(nperm=999))
 
+summary(indval)
 
+# Phi coefficient analysis
+fish.rel = decostand(fish,
+    method='total')
+phi = multipatt(fish.rel, 
+ cluster=quality, 
+ func="r.g", control=how(nperm=999))    
 
-
-
-
-
+summary(phi)
 ```
+
 
 ***Question 1***: Based on the PERMANOVA, IndVal, and phi coefficient analyses, what did you learn about the relationship between habitat quality and the fish species composition?
 Are the different analyses consistent with one another and do they agree with the visualizations (heat maps, cluster dendograms, ordinations) that you created?
 
 > ***Answer 1***: 
-
+> From the last assignment, we saw that the fish species composition can be segregated into different clusters, where each cluster refers to a type of habitat quality (in this assignment). 
+> Here, we used PERMANOVA, IndVal and phi coefficients to see how well the habitat quality influences the fish species compositions.
+> First, let's start with ANOVA. ANOVA  is a statistical test that compares the amount of variation between groups to the amount of variation within each group, which allows us to study the effectiveness of segregating the variables into these groups. More precisely, here, we want to see how fish composition within each habitat group vary compared to how fish composition vary in different groups. 
+> The R2 of the model shows .45, which implies that the model explains 45% of the data, with a statistical signifiance. This means that habitat quality is a good measure to group the fish species composition.
+> Next, using the IndVal test, we see that among the 27 fish species, there are 23 that are representative of two groups. For group with `MQ` habitat quality, `Teso` is the representative species. While for group `HQ+MQ`, there are 2 representative species, for group `LQ+MQ`, there are 20 representative species. All of them are significant.
+> For phi coefficient test, we didn't see the same representative species as the IndVal test. The only group in phi coefficient test that is close enough to the IndVal test's `HQ+MQ` test is group `HQ` for two species Satr and Phph.
+> I would say the phi coefficient test seems more reliable as it aligns better with the PCOA plot. The PCOA plot showed that the fish species Satr, Phph and Neba are more representative of a group ( leftest on the PCOA1 axe), while the species Alal, Ruru and Lece are more representative of another group (upper part on PCOA2). And these were captured by the phi coefficient test.
 
 ### B.  Multivariate Procedures for Continuous Designs
 
@@ -95,17 +119,22 @@ In the R code chunk below, do the following:
 2. use a Mantel test to test the hypothesis that fish assemblages are correlated with stream environmental variables.
 
 ```{r}
+# Distance matrices
+fish.dist = vegdist(doubs$fish[-8,], method="bray")
+env.dist = vegdist(scale(doubs$env[-8, ]), method="euclid")
 
-
-
-
-
+# Mantel test
+mantel(fish.dist, env.dist, method="pearson", permutations = 1000)
 ```
 
 ***Question 2***: What do the results from our Mantel test suggest about fish diversity and stream environmental conditions? 
 How does this relate to your hypothesis about stream quality influencing fish communities?
 
 > ***Answer 2***:  
+> Based on what we learned from class, the Mantel class assessed the correlation between two dissimilarity matrices. Here, our first matrix is the dissimilarity matrix (Bray-Curtis distance) of the fishes composition between sites, and the second one is the dissimilarity matrix of environmental variables between sites. 
+> The test showed r=0.604, which means that there is relatively strong positive correlation. We can interpret it that as the environmental differences between sites increase, the dissimilarity in fish communities also tends to increase.
+> Next, the signifiance of the test is 0.0009, meaning the p-val = 0.0001. This p-value indicates that there is only a 0.1% chance of obtaining a correlation of 0.604 or higher if there were actually no relationship between the fish and environmental distances. (Since the Mantel test is one tailed).
+> This once again confirms our hypothesis that the stream quality influences the fish composition.
 
 ### ii.  Constrained Ordination
 In the R code chunk below, do the following:  
@@ -118,23 +147,42 @@ In the R code chunk below, do the following:
 6. plot the constrained ordination results including labeled points for each site, and
 7. add vectors that demonstrate the influence of each environmental factor the constrained ordination.   
 ```{r}
+# Bray Curtis distance for fish
+fish.db = vegdist(fish, method="bray")
+
+# Creat env matrix
+env.chem = as.matrix(doubs$env[-8, 5:11])
+
+# dbRDA
+# ?dbrda test formula, data using euclidean distance
+# Here, we test fish.db data using all variables in env.chem
+doubs.dbrda.modfull = dbrda(fish.db ~ ., as.data.frame(env.chem))
+ordiplot(doubs.dbrda.modfull)
+
+# Check the pairwise correlation
+psych::corr.test(env.chem) 
+# wee see that pho and nit are very correlated 0.8, similar to oxy and pho -.76
+# Highly correlated variables => may be overfit
 
 
+# ===============================================
+# Try model with constant explained variables
+doubs.dbrda.mod0 = dbrda(
+    fish.db ~ 1, 
+    as.data.frame(env.chem)
+    )
+ordiplot(doubs.dbrda.mod0) # no vector as we don't use any variable in env.chem
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Next, we will test all combination from 0 explanatory variable to full
+# This functions returns the one that has lowest AIC
+doubs.dbrda = ordiR2step(doubs.dbrda.mod0,
+   doubs.dbrda.modfull, perm.max=200)
+ 
+ # Summary of selected model
+ doubs.dbrda$call # formula = fish.db ~ oxy + bdo + nit
+ doubs.dbrda$anova
+ ordiplot(doubs.dbrda)
 
 
 ```
@@ -142,6 +190,7 @@ In the R code chunk below, do the following:
 ***Question 3***: Based on the constrained ordination, what are the environmental variables (or groups of correlated variables) that seem to be contributing to variation in fish community structure?
 
 > ***Answer 3***: 
+> The variables that contributed to the variation in fish community structure are : `oxy, bdo, nit`. All these variables have a significant p value. The model explains 0.53 of the varaition in the fish community. 
 
 ### iii. Variation Partitioning
 In the code chunk below,   
@@ -153,22 +202,248 @@ In the code chunk below,
 5. Partition the variation among sites into the relative importance of space, environment, spatially structured environment, and residuals,
 6. Plot the variation partitioning output to visualize it.  
 ```{r}
+# Create a matrix model for the envr dataq
+env.mod = model.matrix( ~ oxy + bdo + nit, as.data.frame(env.chem))[,-1]
+env.mod
+
+#cCreate spatial model
+# first, weight each site by its relative abundance
+rs = rowSums(fish) / sum(fish)
+
+# Perform PCNM
+doubs.pcnmw = pcnm(dist(doubs$xy[-8,]), w=rs, dist.re=T)
+# doubs.pcnmw
+doubs.pcnmw$values > 0 # Extract only eigenvectors associated with positive eigenvalues 
+
+# Perform model selection of spatial data
+doubs.space = as.data.frame(scores(doubs.pcnmw))
+doubs.pcnm.mod0 = dbrda(fish.db ~ 1,doubs.space) # no var
+doubs.pcnm.mod1 = dbrda(fish.db ~ .,doubs.space) # all var
+# Stepwise model selection
+step.pcnm = ordiR2step(
+    doubs.pcnm.mod0,
+    doubs.pcnm.mod1,
+    perm.max=200)
+plot(step.pcnm)
+# Check the portion of explained variation of the fish composition using the spatial model
+step.pcnm$anova
+
+# Final spatial model
+space.mod = model.matrix(~ PCNM2 + PCNM3 + PCNM5 + PCNM1 +
+ PCNM13 + PCNM16 + PCNM6,
+ doubs.space)[,-1]
 
 
+# ============================================
+# Compare env and spatial model
+doubs.total.env = dbrda(fish.db ~ env.mod)
+doubs.total.space = dbrda(fish.db ~ space.mod)
 
+#  PArtial constrained ordination 
+# ?Condition --> control the second explanatory matrix
+doubs.env.cond.space = dbrda(fish.db ~ env.mod + Condition(space.mod))
+doubs.space.cond.env = dbrda(fish.db ~ space.mod
++ Condition(env.mod))
 
+# Test for significance of the dbRDA fractions
+permutest(doubs.env.cond.space,permutations=999)
+permutest(doubs.space.cond.env,permutations=999)
+permutest(doubs.total.env,permutations=999)
+permutest(doubs.total.space,permutations=999)
 
-
-
+# Calculate the fraction of variation explained by space alone, by env alone and by both, and by neither
+ doubs.varpart = varpart(fish.db, env.mod, space.mod)
+ doubs.varpart
+ par(mar = c(2,2,2,2))
+ plot(doubs.varpart)
+ text(1, 0.25, "Space")
+ text(0, 0.25, "Env")
+ mtext("Variation Partitioning of\nDoubs Fish Diversity", side = 3, line =-3)
 ```
 
 ***Question 4***: Interpret the variation partitioning results.   
 
 > ***Answer 4***: 
+> For the last partition table, we see that the total sum of squre in the dissimilarity data is 6.67.
+> Two sets of explanatory variables in consideration are: env.mod and space.mod (X2 - the spatial variables derived from PCNM).
+> First, when using the environmental variables (plus any variation they share with spatial factors), the adjusted R² is 0.498. This means that 49.8% of the variation in the fish community is explained.
+> Secondly, when using the spatial variables (plus their shared effects with environmental variables), the model explains 60.4% of the variation.
+> When both sets of variables are used together, the model explains about 73% of the total variation in the fish community.
+> If we consider only environmental effect, the model explains only 13% of the variation. If we consider only pure spatial effect, the model explains about 23.6% of the variation. The variation explained by both environment and space is about 36% of the variation. 
+> The environmental variables on their own explain only a small portion (13%) of the variation, while the spatial variables independently explain a larger fraction (23.6%). A substantial amount of variation (36%) is explained by the overlap between the two, and together they account for 73% of the total variation in the fish community composition.
+
 
 ## SYNTHESIS
-
 Load the dataset from that you and your partner are using for the team project. 
 Use one of the hypothesis-testing tools introduced in the beta diversity module. 
 Interpret the findings of your data with respect to principles of biodiversity. 
 
+
+> ***Answer***:
+> After our previous analysis of the zoobenthos data, we discovered that over the past 10 years there were only three distinct sites where we had environmental data over time (at least 2+ years). 
+> To work around this, we treated each site's data for each year as a separate sample.
+> When we examined the heatmap of zoobenthos abundance, we saw that the samples clustered into three main groups, which makes sense given that there are three sites.
+> However, we also noticed that sites 0 and 2 tend to be similar to each other, while site 1 maintains a more consistent zoobenthos composition over the years.
+> Furthermore, Ward's Clustering showed quite an interesting pattern: sites 0 and 2 are sometimes more similar to each other than to themselves in certain years (for example, the cluster containing 0_1995 and 0_2002 at the third rightmost cluster in the dendrogram).
+
+> Now, we will now use PERMANOVA to determine if the zoobenthos composition differs significantly between sites and across years.
+```{r}
+library(vegan)
+library(indicspecies)
+
+
+# Load data
+# zoobenthos = read.csv(paste0(getwd(),"/Week4-Beta/data/SbS_full.csv"), row.names=1)
+zoobenthos = read.csv("data/SbS_full.csv", row.names=1)
+# We create a factor vector that categorizes the sites based on the dendogram
+groups = c(
+    rep("GR2", 1), # 0_1994
+    rep("GR3", 1), # 0_1995
+    rep("GR2", 5), # 0_1997 - 0_2001
+    rep("GR3", 1), # 0_2002
+    rep("GR2", 2), # 0_2003 - 0_2004
+    rep("GR1", 7), # 1_1994 - 1_2004
+    rep("GR3", 9)) # 2_1994 - 2_2004
+
+# Run PERMANOVA
+adonis2(zoobenthos ~ groups, method="bray", permutations=999)
+
+## IndVal matrix
+indval = multipatt(zoobenthos, cluster=groups, func = "IndVal.g", control = how(nperm=100))
+summary(indval)
+
+# Phi coefficient analysis
+zoobenthos.rel = decostand(zoobenthos, method='total')
+phi = multipatt(zoobenthos.rel, cluster=groups, func="r.g", control=how(nperm=100))    
+summary(phi)
+```
+
+
+> **Comments about PERMANOVA, IndVal and phi coefficient analyses**:
+> Here we see that the PERMANOVA test supports that there are significant differences in zoobenthos composition between the 3 groups that differentiate the sites and some sites in specific years. 
+> For IndVal analysis, we saw that there are 34 species that are significantly associated with the groups. For example, species such as Pygospio elegans, Mytilus edulis, and Macoma balthica are strongly associated with GR1. There are 16 species that are significantly linked to GR2, and 3 species show an association with the combination of groups GR2 and GR3. This is interesting as we saw that sites 0 and 2 are sometimes more similar to each other than to themselves in certain years.
+> The phi coefficient analysis showed that the species Pygospio elegans, Mytilus edulis, and Macoma balthica are strongly associated with GR1, which is consistent with the IndVal analysis. Here we see a similar grouping as IndVal.
+
+
+```{r}
+# Load environmental data
+# zoobenthos.env = read.csv(paste0(getwd(),"/Week4-Beta/data/env_data.csv"), row.names=1)
+zoobenthos.env = read.csv("data/env_data.csv", header = TRUE, row.names=1)
+
+# Distance matrices of the zoobenthos data
+zoobenthos.dist = vegdist(zoobenthos, method="bray")
+zoobenthos.env.dist = vegdist(scale(zoobenthos.env), method="euclid")
+
+# Mantel test
+mantel(zoobenthos.dist, zoobenthos.env.dist, method="pearson", permutations = 1000)
+```
+
+> **Comments about Mantel test**:
+In the Mantel test, we compare the dissimilarities in zoobenthos community composition with the differences in environmental conditions (using Euclidean distances on scaled data). First, we see that the statistic r is 0.451, which is a moderate positive correlation. This means that sites that are more different in their environmental conditions tend to also be more different in their zoobenthos communities. Here, the p-value is 0.0001, which is very small. This indicates that the correlation is statistically significant. 
+
+
+```{r}
+# Bray Curtis distance for zoobenthos
+zoobenthos.db = vegdist(zoobenthos, method="bray")
+
+# Creat env matrix
+env.vars = as.matrix(zoobenthos.env)
+
+# dbRDA
+# png("Outputs/dbrda_plot_all.png", width = 4000, height = 3000, res = 500)
+zoobenthos.dbrda.modfull = dbrda(zoobenthos.db ~ ., as.data.frame(env.vars))
+ordiplot(zoobenthos.dbrda.modfull)
+# dev.off()
+
+# Check the pairwise correlation
+psych::corr.test(env.vars) 
+
+# ===============================================
+# Try model with constant explained variables
+zoobenthos.dbrda.mod0 = dbrda(zoobenthos.db  ~ 1, as.data.frame(env.vars))
+ordiplot(zoobenthos.dbrda.mod0) # no vector as we don't use any variable in env.chem
+
+# Next, we will test all combination from 0 explanatory variable to full
+# This functions returns the one that has lowest AIC
+zoobenthos.dbrda = ordiR2step(zoobenthos.dbrda.mod0, zoobenthos.dbrda.modfull, perm.max=200)
+ 
+ # Summary of selected model
+zoobenthos.dbrda$call # formula = fish.db ~ oxy + bdo + nit
+zoobenthos.dbrda$anova
+# png("Outputs/dbrda_plot_best.png", width = 4000, height = 3000, res = 500)
+ordiplot(zoobenthos.dbrda)
+text(zoobenthos.dbrda, display = "sites", cex = 0.4, pos = 3)
+# dev.off()
+
+```
+
+> **Comments about the constrained ordination**:
+> To keep this short, we see that 3 environmental variables pH, bottom depth, and nitrate—are significant predictors of zoobenthos community composition. Together, they explain about 41% of the variation. The stepwise model selection confirms that each of these variables contributes significantly, and the ordination plot provides a visual representation of these environmental gradients and their effect on community structure.
+> We also note that these variables are not highly correlated with each other, which is good for the model.
+```{r}
+# Create a matrix model for the envr data
+env.mod = model.matrix( ~ ph + bot_depth + nitrate, as.data.frame(env.vars))[,-1]
+# env.mod
+
+#cCreate spatial model
+# first, weight each site by its relative abundance
+rs = rowSums(zoobenthos) / sum(zoobenthos)
+
+# Load spatial data
+# zoobenthos.coords = read.csv(paste0(getwd(),"/Week4-Beta/data/site_coords.csv"), header = TRUE, row.names=1)
+zoobenthos.coords = read.csv("data/site_coords.csv", header = TRUE, row.names=1)
+zoobenthos.pcnmw = pcnm(dist(zoobenthos.coords), w=rs, dist.re=T) # Perform PCNM on the coordinates
+zoobenthos.pcnmw$values > 0 # Extract only eigenvectors associated with positive eigenvalues 
+
+# Perform model selection of spatial data
+zoobenthos.space = as.data.frame(scores(zoobenthos.pcnmw))
+zoobenthos.pcnmw.mod0 = dbrda(zoobenthos.db ~ 1, zoobenthos.space) # no var
+zoobenthos.pcnmw.mod1 = dbrda(zoobenthos.db ~ ., zoobenthos.space) # all var
+# Stepwise model selection
+step.pcnm = ordiR2step(zoobenthos.pcnmw.mod0, zoobenthos.pcnmw.mod1, perm.max=200)
+# png("Outputs/step_pcnm.png", width = 4000, height = 3000, res = 500)
+plot(step.pcnm)
+# dev.off()
+step.pcnm$call
+# Check the portion of explained variation of the fish composition using the spatial model
+step.pcnm$anova
+
+# Final spatial model
+space.mod = model.matrix(~ PCNM1, zoobenthos.space)[,-1]
+
+
+# ============================================
+# Compare env and spatial model
+zoobenthos.total.env = dbrda(zoobenthos.db ~ env.mod)
+zoobenthos.total.space = dbrda(zoobenthos.db ~ space.mod)
+
+#  PArtial constrained ordination 
+# ?Condition --> control the second explanatory matrix
+zoobenthos.env.cond.space = dbrda(zoobenthos.db ~ env.mod + Condition(space.mod))
+zoobenthos.space.cond.env = dbrda(zoobenthos.db ~ space.mod + Condition(env.mod))
+
+# Test for significance of the dbRDA fractions
+permutest(zoobenthos.env.cond.space,permutations=999)
+permutest(zoobenthos.space.cond.env,permutations=999)
+permutest(zoobenthos.total.env,permutations=999)
+permutest(zoobenthos.total.space,permutations=999)
+
+# Calculate the fraction of variation explained by space alone, by env alone and by both, and by neither
+zoobenthos.varpart = varpart(zoobenthos.db, env.mod, space.mod)
+zoobenthos.varpart
+# png("Outputs/zoobenthos_varpart.png", width = 4000, height = 3000, res = 500)
+par(mar = c(2,2,2,2))
+plot(zoobenthos.varpart)
+text(1, 0.25, "Space")
+text(0, 0.25, "Env")
+mtext("Variation Partitioning of\nZoobenthos Diversity", side = 3, line =-3)
+# dev.off()
+
+```
+
+> **Comments about the variation partitioning including spatial data**:
+> For the spatial model PCNM, we identified that there is only a single eigenvector, PCNM1, best captured the spatial structure. This spatial predictor (PCNM1) explains about 20% of the variation in zoobenthos community composition (adjusted R^2= 0.202).
+> For the model using environmental effects controlling for space. We see that the model was still highly significant. This means that that the environmental variables (pH, bottom depth, nitrate) significantly explain community variation even after accounting for spatial structure.
+> In contrast, the spatial effects controlling for environment,
+the model was marginally non-significant, suggesting that when the environmental effects are removed, the remaining spatial signal is weak. 
+Using both environment and space together, the model explains 40.7% of the variation (R&2 adjusted).
