@@ -288,6 +288,7 @@ Interpret the findings of your data with respect to principles of biodiversity.
 
 > Now, we will now use PERMANOVA to determine if the zoobenthos composition differs significantly between sites and across years.
 ```{r}
+
 library(vegan)
 library(indicspecies)
 
@@ -327,12 +328,14 @@ summary(phi)
 
 ```{r}
 # Load environmental data
+
 # zoobenthos.env = read.csv(paste0(getwd(),"/Week4-Beta/data/env_data.csv"), row.names=1)
 zoobenthos.env = read.csv("data/env_data.csv", header = TRUE, row.names=1)
 
 # Distance matrices of the zoobenthos data
 zoobenthos.dist = vegdist(zoobenthos, method="bray")
 zoobenthos.env.dist = vegdist(scale(zoobenthos.env), method="euclid")
+
 
 # Mantel test
 mantel(zoobenthos.dist, zoobenthos.env.dist, method="pearson", permutations = 1000)
@@ -343,6 +346,7 @@ In the Mantel test, we compare the dissimilarities in zoobenthos community compo
 
 
 ```{r}
+
 # Bray Curtis distance for zoobenthos
 zoobenthos.db = vegdist(zoobenthos, method="bray")
 
@@ -367,22 +371,24 @@ ordiplot(zoobenthos.dbrda.mod0) # no vector as we don't use any variable in env.
 # This functions returns the one that has lowest AIC
 zoobenthos.dbrda = ordiR2step(zoobenthos.dbrda.mod0, zoobenthos.dbrda.modfull, perm.max=200)
  
- # Summary of selected model
-zoobenthos.dbrda$call # formula = fish.db ~ oxy + bdo + nit
+# Summary of selected model
+zoobenthos.dbrda$call   # zoobenthos.db ~ ph + bot_depth + nitrate + min_depth
 zoobenthos.dbrda$anova
 # png("Outputs/dbrda_plot_best.png", width = 4000, height = 3000, res = 500)
-ordiplot(zoobenthos.dbrda)
+ordiplot(zoobenthos.dbrda) 
 text(zoobenthos.dbrda, display = "sites", cex = 0.4, pos = 3)
 # dev.off()
 
 ```
 
 > **Comments about the constrained ordination**:
-> To keep this short, we see that 3 environmental variables pH, bottom depth, and nitrate—are significant predictors of zoobenthos community composition. Together, they explain about 41% of the variation. The stepwise model selection confirms that each of these variables contributes significantly, and the ordination plot provides a visual representation of these environmental gradients and their effect on community structure.
+> To keep this short, we see that 4 environmental variables pH, bottom depth, and nitrate are significant predictors of zoobenthos community composition. Together, they explain about 41% of the variation. 
+> The stepwise model selection confirms that each of these variables contributes significantly, and the ordination plot provides a visual representation of these environmental gradients and their effect on community structure.
 > We also note that these variables are not highly correlated with each other, which is good for the model.
 ```{r}
+
 # Create a matrix model for the envr data
-env.mod = model.matrix( ~ ph + bot_depth + nitrate, as.data.frame(env.vars))[,-1]
+env.mod = model.matrix( ~ ph + bot_depth + min_depth + nitrate, as.data.frame(env.vars))[,-1]
 # env.mod
 
 #cCreate spatial model
@@ -442,8 +448,20 @@ mtext("Variation Partitioning of\nZoobenthos Diversity", side = 3, line =-3)
 ```
 
 > **Comments about the variation partitioning including spatial data**:
-> For the spatial model PCNM, we identified that there is only a single eigenvector, PCNM1, best captured the spatial structure. This spatial predictor (PCNM1) explains about 20% of the variation in zoobenthos community composition (adjusted R^2= 0.202).
-> For the model using environmental effects controlling for space. We see that the model was still highly significant. This means that that the environmental variables (pH, bottom depth, nitrate) significantly explain community variation even after accounting for spatial structure.
-> In contrast, the spatial effects controlling for environment,
-the model was marginally non-significant, suggesting that when the environmental effects are removed, the remaining spatial signal is weak. 
-Using both environment and space together, the model explains 40.7% of the variation (R&2 adjusted).
+>
+> For the spatial model PCNM
+> We identified that there is only a single eigenvector, PCNM1, best captured the spatial structure. This spatial predictor (PCNM1) explains about 20% of the variation in zoobenthos community composition (adjusted R^2= 0.202).
+>
+> For the model using spatial variables controlling for environment variables,
+> We see that the model is significant (adjusted R-squared 20%). 
+> This means that that the environmental variables (pH, bottom depth, nitrate and minimal depth) significantly explain community variation even after accounting for spatial structure.
+>
+> In contrast, for the model using environemental variables controlling for spatial factors,
+> we see that the model has less explainatory power (R^2 adjusted = 20%). 
+> This suggests that the spatial variation is not a significant driver of the zoobenthos biodiversities between sites.
+>
+> If we take each model  excluding the other set of explainatory variables:
+> For the model using only environemental variables, interestingly, the adjusted R squared value decreased by half (21%)
+> For the model using only spatial variable, expectedly, the adjusted R squared value is very low (1%).
+> We also see that when using both environment and space together, the model explains 40.7% of the variation (R&2 adjusted).
+> This shows that we need to take in account additional factors that influence the variation of biodiversities between sites of the zoobenthos.
