@@ -1,6 +1,6 @@
 ---
 title: '7\. Worksheet: Diversity Synthesis'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Trang Nguyen; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -65,8 +65,26 @@ In the R code chunk below, please provide the code to:
 4) Load the `vegan` R package (be sure to install first if you have not already).
 
 ```{r}
+data = read.csv("./data/jelly.source.comm.csv")
+data
 
 
+rm(list = ls())
+getwd()
+setwd(getwd())
+library(vegan)
+library(BiodiversityR)
+
+# Load data
+sbys = read.table("./data/Jb_sbs.tsv", header = TRUE, sep = "\t", row.names = 1)
+pref = read.table("./data/Jb_pref.tsv", header = TRUE, sep = "\t", row.names = 1)
+
+# Clean data
+sum(is.na(sbys)) # check NA
+sbys[is.na(sbys)] <- 0
+
+# Clean preference data
+sum(is.na(pref)) # check NA
 ```
 
 ## DATA ANALYSIS
@@ -76,13 +94,29 @@ Based on these results, discuss how individual vs. collective sampling efforts c
 
 ```{r}
 
+# Remove rows with zero counts
+sbys <- sbys[rowSums(sbys) > 0, ]
+
+# Find minimum sample size for rarefaction
+min.N_sbys <- min(rowSums(sbys))
+
+# Perform rarefaction (estimates richness but does NOT modify raw data)
+sbys.rarefy <- rarefy(sbys, sample = min.N_sbys, se = TRUE)
+
+# Plot rarefaction curves using the ORIGINAL sbys
+rarecurve(sbys, step=20, col="blue", cex=0.6, las=1)
+# 5. Add the 1:1 line and label.
+abline(0, 1, col="red")
+text(1500, 1500, "1:1 line", col="red", pos=2)
 
 ```
 
 > ***Answer 1***:
->
-
-
+> The rarefaction plot allows us to compare species richness across different sample sizes. 
+> These curves show that as more individuals are sampled, the number of observed species increases but never reaches an asymptote.
+> This suggests that the jar had has lots of different jelly beans types and that new types continue to be found with additional sampling.
+> The rarefaction curves also show that the class sampling efforts capture only a small fraction of the total diversity in jar.
+> 
 **Question 2:** Starting with the site-by-species matrix, visualize beta diversity.
 In the code chunk below, conduct principal coordinates analyses (PCoA) using both an abundance- and incidence-based resemblance matrix.
 Plot the sample scores in species space using different colors, symbols, or labels.
@@ -90,23 +124,147 @@ Which "species" are contributing the patterns in the ordinations?
 How does the choice of resemblance matrix affect your interpretation?
 
 ```{r}
+# Calculate Bray-Curtis distance
+sbys.db = vegdist(sbys, method = "bray")
 
+# PCoA
+sbys.pcoa = cmdscale(sbys.db, k = 2, eig = TRUE)
+sbys.pcoa
+
+# Explained variance for first 3 axes
+explained_variance = round(sum(sbys.pcoa$eig[1:3]/sum(sbys.pcoa$eig)) * 100, 2)
+print("Explained variance of the 3 first axes:")
+print(explained_variance)
+
+## Plot PCoA
+##===============================
+# Define Plot Parameters
+par(mar=c(1,5,2,2) + 0.1)
+
+# Initiate Plot
+plot(sbys.pcoa$points[ ,1], 
+  sbys.pcoa$points[ ,2], 
+     xlab = "PCoA 1",
+     ylab = "PCoA 2",
+     pch = 16, cex = 2,  type = "n", cex.lab = 1.5, 
+     cex.axis = 0.5, axes = FALSE)
+
+# # Add Axes
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+
+# # Add People
+points(sbys.pcoa$points[ ,1], 
+  sbys.pcoa$points[ ,2],
+  pch = 19, cex = 3, bg = "gray", col = "gray")
+text(sbys.pcoa$points[ ,1], sbys.pcoa$points[ ,2], 
+     labels = row.names(sbys.pcoa$points))
+  
+# Add candies
+sbysCAN <- sbys
+for(i in 1:nrow(sbys)){
+    sbysCAN[i, ] = sbys[i, ] / sum(sbys[i, ])
+    } 
+# Plot the candies
+sbys.pcoa <- add.spec.scores(
+  sbys.pcoa,
+  sbysCAN,
+  method = "pcoa.scores")
+
+text(
+  sbys.pcoa$cproj[ ,1], 
+  sbys.pcoa$cproj[ ,2], 
+  labels = row.names(sbys.pcoa$cproj), col = "red",
+  cex=1)
+
+
+
+# Try another dissimilarities
+sbys.dk = vegdist(sbys, method = "euclidean")
+
+# PCoA
+sbys.pcoa = cmdscale(sbys.dk, k = 2, eig = TRUE)
+sbys.pcoa
+
+# Explained variance for first 3 axes
+explained_variance = round(sum(sbys.pcoa$eig[1:3]/sum(sbys.pcoa$eig)) * 100, 2)
+
+## Plot PCoA
+##===============================
+# Define Plot Parameters
+par(mar=c(1,5,2,2) + 0.1)
+# Initiate Plot
+plot(sbys.pcoa$points[ ,1], 
+  sbys.pcoa$points[ ,2], 
+     xlab = "PCoA 1",
+     ylab = "PCoA 2",
+     pch = 16, cex = 2,  type = "n", cex.lab = 1.5, 
+     cex.axis = 0.5, axes = FALSE)
+
+# # Add Axes
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+
+# # Add People
+points(sbys.pcoa$points[ ,1], 
+  sbys.pcoa$points[ ,2],
+  pch = 19, cex = 3, bg = "gray", col = "gray")
+text(sbys.pcoa$points[ ,1], sbys.pcoa$points[ ,2], 
+     labels = row.names(sbys.pcoa$points))
+  
+# Add candies
+sbysCAN <- sbys
+for(i in 1:nrow(sbys)){
+    sbysCAN[i, ] = sbys[i, ] / sum(sbys[i, ])
+    } 
+
+library(BiodiversityR)
+# Plot the candies
+sbys.pcoa <- BiodiversityR::add.spec.scores(
+  sbys.pcoa,
+  sbysCAN,
+  method = "pcoa.scores")
+
+text(
+  sbys.pcoa$cproj[ ,1], 
+  sbys.pcoa$cproj[ ,2], 
+  labels = row.names(sbys.pcoa$cproj), col = "red",
+  cex=1)
 
 ```
 
 > ***Answer 2***:
->
-
+> The PCoA plots reveal how different jelly bean preference profiles group together based on similarity in abundance and presence-absence patterns.
+> The Bray-Curtis dissimilarity matrix emphasizes relative abundances, meaning common species have a greater influence on distances.
+> The Euclidean distance matrix treats all taxa equally and may be more affected by rare species.
+> **Bray_Curtis**:
+>  On the Bray Curtis PCOA plot, students are clustered based on their jelly bean preferences.
+>  Students who are close together on the plot have similar jelley bean sampled. Bryan and Jocelyn are very close, suggesting they have highly similar jelly bean samples.
+Elaine and Madison are positioned in the lower-left quadrant, implying their sampled jelly beans are distinct from others.
+> Caramel Corn, Toasted Marshmallow, and Coconut are positioned near Anna and Ashish, indicating they share these flavors.
+> Blueberry and Berry Blue are closer to myself and Jaeyoung, suggesting they share these flavors.
+>  The Euclidean PCoA plot shows a different pattern, with students more evenly distributed across the plot.
 
 **Question 3** Using the preference-profile matrix, determine the most popular jelly bean in the class using a control structure (e.g., for loop, if statement, function, etc).
 
 ```{r}
+# Find the most popular jelly bean
+# Exclude the people column
+most_popular <- colnames(pref)[which.max(colSums(pref))]
+
+# Print the most popular item
+print(most_popular)
+
 
 
 ```
 
 > ***Answer 3***:
->
+>The most popular jelly bean is Raspberry.
 
 
 **Question 4**
@@ -118,12 +276,18 @@ Make some observations about the preference-profiles of the class.
 
 
 ```{r}
+pref.d = vegdist(pref, method = "jaccard")
+pref.hc = hclust(pref.d, method = "ward.D")
+
+# Plot the dendrogram
+plot(pref.hc, main = "Preference Profile Dendrogram", xlab = "Jaccard distance")
+
 
 
 ```
 
 > ***Answer 4***:
->
+> Based on the dendogram, my closest preference match is Aishwarya. If I zoom out a bit, Aishwarya and I are also closely related to Anna, forming a subgroup that shares similar preferences.
 
 
 

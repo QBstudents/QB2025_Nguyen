@@ -332,6 +332,7 @@ summary(phi)
 # zoobenthos.env = read.csv(paste0(getwd(),"/Week4-Beta/data/env_data.csv"), row.names=1)
 zoobenthos.env = read.csv("data/env_data.csv", header = TRUE, row.names=1)
 
+
 # Distance matrices of the zoobenthos data
 zoobenthos.dist = vegdist(zoobenthos, method="bray")
 zoobenthos.env.dist = vegdist(scale(zoobenthos.env), method="euclid")
