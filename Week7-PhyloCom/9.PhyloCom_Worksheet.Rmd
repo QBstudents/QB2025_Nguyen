@@ -1,6 +1,6 @@
 ---
 title: '9\.Phylogenetic Diversity - Communities'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Trang Nguyen; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -46,7 +46,21 @@ In the R code chunk below, provide the code to:
 
 ```{r}
 
+rm(list = ls())
+getwd()
 
+# Load packages
+package.list <- c('picante', 'ape', 'seqinr', 'vegan', 'fossil', 
+                  'reshape', 'devtools', 'BiocManager', 'ineq', 
+                  'labdsv', 'matrixStats', 'pROC')
+for (package in package.list) {
+  if (!require(package, character.only = TRUE, quietly = TRUE)) {
+    install.packages(package, repos='http://cran.us.r-project.org')
+    library(package, character.only = TRUE)
+  }
+}
+
+source("./bin/MothurTools.R")
 ```
 
 ## 2) DESCRIPTION OF DATA
@@ -72,7 +86,27 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+env <- read.table("data/20130801_PondDataMod.csv", sep = ",", header = TRUE)
+env <- na.omit(env)
 
+
+# Load Site-by-Species Matrix
+comm <- read.otu(shared = "./data/INPonds.final.rdp.shared", cutoff = "1")
+
+# Select DNA data using `grep()`
+comm <- comm[grep("*-DNA", rownames(comm)), ]
+
+# Perform replacement of all matches with `gsub()`
+rownames(comm) <- gsub("\\-DNA", "", rownames(comm))
+rownames(comm) <- gsub("\\_", "", rownames(comm))
+
+# Remove sites not in the environmental data set
+comm <- comm[rownames(comm)  %in% env$Sample_ID, ]
+
+# Remove zero-abundance OTUs from data set
+comm <- comm[ , colSums(comm) > 0]
+
+tax <- read.tax(taxonomy = "./data/INPonds.final.rdp.1.cons.taxonomy")
 ```
 
 Next, in the R code chunk below, do the following:  
@@ -87,8 +121,51 @@ Next, in the R code chunk below, do the following:
 9. plot the rooted tree.
 
 ```{r}
+# Import the alignment file (`seqinr`)
+ponds.cons <- read.alignment(file = "./data/INPonds.final.rdp.1.rep.fasta", 
+                             format = "fasta")  
+
+# Rename OTUs in the FASTA File
+
+# 2023, there was an issue with original gsub code,
+# perhaps due to UTF8 ASCII character issue
+# ponds.cons$nam <- gsub("\\|.*$", "", gsub("^.*?\t", "", ponds.cons$nam))
+# new gsub() code seems to help:
+
+ponds.cons$nam <- gsub(".*\t", "", ponds.cons$nam)
+ponds.cons$nam <- gsub("\\|.*", "", ponds.cons$nam)
+
+# Import outgroup sequence
+outgroup <- read.alignment(file = "./data/methanosarcina.fasta", format = "fasta")
+
+# Convert alignment file to DNAbin
+DNAbin <- rbind(as.DNAbin(outgroup),as.DNAbin(ponds.cons))
+
+# Visualize alignment
+image.DNAbin(DNAbin, show.labels = T, cex.lab = 0.05, las = 1) 
 
 
+# Make distance matrix (`ape`)
+seq.dist.jc <- dist.dna(DNAbin, model = "JC", pairwise.deletion = FALSE)
+
+# Make a neigbor-joining tree file (`ape`)
+phy.all <- bionj(seq.dist.jc)
+
+# Drop tips of zero-occurrence OTUs (`ape`)
+phy <- drop.tip(phy.all, phy.all$tip.label[!phy.all$tip.label %in% 
+              c(colnames(comm), "Methanosarcina")])
+
+# Identify outgroup sequence
+outgroup <- match("Methanosarcina", phy$tip.label)
+
+# Root the tree {ape}
+phy <- root(phy, outgroup, resolve.root = TRUE)
+
+# Plot the rooted tree {ape}
+par(mar = c(1, 1, 2, 1) + 0.1)
+plot.phylo(phy, main = "Neighbor Joining Tree", "phylogram", 
+      show.tip.label = FALSE, use.edge.length = FALSE, 
+      direction = "right", cex = 0.6, label.offset = 1)
 ```
 
 ## 4) PHYLOGENETIC ALPHA DIVERSITY
@@ -98,7 +175,8 @@ In the R code chunk below, do the following:
 1. calculate Faith's D using the `pd()` function.
 
 ```{r}
-
+# Calculate PD and S {picante}
+pd <- pd(comm, phy, include.root = FALSE)
 
 ```
 
@@ -109,7 +187,20 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+# Biplot of S and PD
+par(mar = c(5, 5, 4, 1) + 0.1)
 
+plot(log(pd$S), log(pd$PD), 
+     pch = 20, col = "red", las = 1,
+     xlab = "ln(S)", ylab = "ln(PD)", cex.main = 1,
+     main="Phylodiversity (PD) vs. Taxonomic richness (S)")
+
+# Test of power-law relationship
+fit <- lm('log(pd$PD) ~ log(pd$S)')
+abline(fit, col = "red", lw = 2)
+exponent <- round(coefficients(fit)[2], 2)
+legend("topleft", legend=paste("Scaling exponent = ", exponent, sep = ""), 
+       bty = "n", lw = 2, col = "red") 
 ```
 
 ***Question 1***: Answer the following questions about the PD-S pattern.    
@@ -118,8 +209,15 @@ b.  When would you expect these two estimates of diversity to deviate from one a
 c.  Interpret the significance of the scaling PD-S scaling exponent.
 
 > ***Answer 1a***:  
+> Phylogenetic diversity (PD) is a measure of the total evolutionary history represented by a set of species or taxa, which takes information from the phylogenetic tree. 
+> It is related to taxonomic richness (S) because as the number of species increases (higher S), the amount of evolutionary history (or phylogenetic diversity) also tends to increase. Therefore, the more species I have in a community, the more diverse and evolutionary history the community represents, resulting in higher PD.
 > ***Answer 1b***:  
+> They deviate when the species in a community are phylogenetically clustered or phylogenetically dispersed. 
+> If species are closely related (phylogenetically clustered), they will share more recent common ancestors, leading to lower PD despite a higher taxonomic richness. 
+> If species are distantly related (phylogenetically dispersed), the PD will be higher relative to the taxonomic richness.
 > ***Answer 1c***:  
+> The scaling exponent in the PD-S pattern (shown by the red line in the plot) indicates the relationship between taxonomic richness (S) and phylogenetic diversity (PD). 
+> A scaling exponent of 0.75 suggests that PD increases at a slower rate than taxonomic richness.
 
 
 **i. Randomizations and Null Models**  
@@ -128,8 +226,11 @@ In the R code chunk below, do the following:
 1. estimate the standardized effect size of PD using the `richness` randomization method.  
 
 ```{r}
+# Estimate standardized effect size of PD via randomization (`picante`)
+ses.pd <- ses.pd(comm[1:2,], phy, null.model = "richness", runs = 25, 
+                 include.root = FALSE)
 
-
+ses.pd
 ```
 
 ***Question 2***: Using `help()` and the table above, run the `ses.pd()` function using two other null models and answer the following questions:
@@ -138,7 +239,14 @@ a.  What are the null and alternative hypotheses you are testing via randomizati
 b.  How did your choice of null model influence your observed ses.pd values?  Explain why this choice affected or did not affect the output. 
 
 > ***Answer 2a***:  
+> The null hypothesis is when (PD) is random with respect to species richness or the structure of the community.
+> The alternative hypothesis is that phylogenetic diversity is non-random and that the observed PD is significantly different from the expected PD under the null model.
+> In the case of the "richness" null model, the null hypothesis is that the species richness is randomly distributed across the phylogeny, meaning that species are randomly placed within the tree's evolutionary history. 
+> 
 > ***Answer 2b***:  
+> The choice of null model influences the observed ses.pd values by determining how the community is randomized for comparison with the observed community.
+> In the case of richness null model: The community is randomized by species richness, which means the species are randomly assigned to the phylogeny, keeping the species count constant but allowing for random placement within the tree. I may find that the observed PD differs from this randomized distribution, the ses.pd value will be non-zero, indicating significant deviation from random phylogenetic distribution.
+> In the case of other null models (e.g., "taxa.labels", "sample.pool"): The null models based on different assumptions of randomness (e.g., randomizing across species labels or using the full sample pool) will result in different expectations for the distribution of PD. These models could lead to different ses.pd values if your community deviates differently from these alternative randomizations.
 
 ### B.  Phylogenetic Dispersion Within a Sample
 Another way to assess phylogenetic $\alpha$-diversity is to look at dispersion within a sample. 
@@ -150,6 +258,8 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+# Create a Phylogenetic Distance Matrix (`picante`)
+phydist <- cophenetic.phylo(phy)
 
 ```
 
@@ -160,7 +270,14 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+# Estimate standardized effect size of NRI via randomization (`picante`) 
+ses.mpd <- ses.mpd(comm, phydist, null.model = "taxa.labels", 
+                   abundance.weighted = FALSE, runs = 25) 
 
+# Calculate NRI
+NRI <- as.matrix(-1 * ((ses.mpd[,2] - ses.mpd[,3]) / ses.mpd[,4]))
+rownames(NRI) <- row.names(ses.mpd)
+colnames(NRI) <- "NRI"
 ```
 
 **iii.  Nearest Taxon Index (NTI)**
@@ -170,7 +287,14 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+# Estimate Standardized Effect Size of NRI via Randomization {picante} 
+ses.mntd <- ses.mntd(comm, phydist, null.model = "taxa.labels", 
+                     abundance.weighted = FALSE, runs = 25)
 
+# Calculate NTI
+NTI <- as.matrix(-1 * ((ses.mntd[,2] - ses.mntd[,3]) / ses.mntd[,4]))
+rownames(NTI) <- row.names(ses.mntd)
+colnames(NTI) <- "NTI"
 ```
 
 ***Question 3***: 
@@ -182,10 +306,40 @@ d. In the NRI and NTI examples above, the arguments "abundance.weighted = FALSE"
 Modify and rerun the code so that NRI and NTI are calculated using abundance data. 
 How does this affect the interpretation of NRI and NTI?
 
+```{r}
+# Calculate NRI with abundance data
+ses.mpd_abundance <- ses.mpd(comm, phydist, null.model = "taxa.labels", 
+                             abundance.weighted = TRUE, runs = 25)
+
+# Calculate NTI with abundance data
+ses.mntd_abundance <- ses.mntd(comm, phydist, null.model = "taxa.labels", 
+                               abundance.weighted = TRUE, runs = 25)
+
+```
+
 > ***Answer 3a***:  
+> The NRI measures the degree of phylogenetic clustering in a community. 
+> It compares the observed mean phylogenetic distance between species in a communit with the expected mean distance under a null model. 
+> If NRI > 0, this means that the community are more closely related to each other than expected by chance. 
+> If NRI < 0, this means that the community are more distantly related to each other than expected by chance.
+> 
 > ***Answer 3b***:  
+> The NTI measures how closely related the species are to their nearest neighbors within the community. 
+> NTI compares the observed distances between the closest species in the community to the expected distances under a random null model.
+> If NTI > 0, this means that the species in the community are more distantly related to their nearest neighbors than expected by chance.
+> If NTI < 0, this means that the species in the community are more closely related to their nearest neighbors than expected by chance.
+> 
 > ***Answer 3c***:  
+> If the NRI is significantly positive, the community is phylogenetically clustered, this means that species are more closely related than expected by chance. 
+> If NRI is negative, the community is more phylogenetically dispersed, with species being distantly related to one another.
+> If the NTI is significantly negative, it suggests phylogenetic clustering, with species being more closely related to their nearest neighbors than expected. 
+> A positive NTI indicates phylogenetic dispersion, where the nearest neighbors are more distantly related than expected.
+> 
 > ***Answer 3d***:  
+> I thin that if we use abundance data, abundant species will have a greater influence on the calculation of phylogenetic clustering. 
+> If a species with high abundance is closely related to others, it will strongly influence whether the community is considered phylogenetically clustered.
+> If we use presence-absence data, the NRI and NTI are not influenced by how many individuals of each species are present, only whether or not the species are present in the community.
+> 
 
 ## 5) PHYLOGENETIC BETA DIVERSITY 
 
@@ -195,7 +349,11 @@ In the R code chunk below, do the following:
 2. calculate the phylogenetically based community resemblance matrix using UniFrac distance.
 
 ```{r}
+# Mean Pairwise Distance
+dist.mp <- comdist(comm, phydist)
 
+# UniFrac Distance (Note: this takes a few minutes; be patient)
+dist.uf <- unifrac(comm, phy)
 
 ```
 
@@ -204,7 +362,12 @@ In the R code chunk below, do the following:
 
 ```{r}
 
-
+par(mar = c(5, 5, 2, 1) + 0.1)
+plot(dist.mp, dist.uf, 
+     pch = 20, col = "red", las = 1, asp = 1, xlim = c(0.15, 0.5), ylim = c(0.15, 0.5),
+     xlab = "Mean Pair Distance", ylab = "UniFrac Distance") 
+abline(b = 1, a = 0, lty = 2)
+text(0.5, 0.47, "1:1")
 ```
 
 ***Question 4***: 
@@ -216,9 +379,16 @@ That means that we are not taking into account the abundance of each taxon in ea
 c. Why might MPD show less variation than UniFrac?
 
 > ***Answer 4a***: 
+> MPD is a metric that measures the average phylogenetic distance between pairs of species in a community. In this case, MPD is based on the sum of the branch lengths between each pair of species in the community. It does not take into account species abundances, meaning it treats species as either present or absent.
+> UniFrac distance is a phylogenetic distance metric that compares the phylogenetic compositions of two communities by considering their shared and unshared branches. It calculates the fraction of a phylogenetic tree's branch length that is unique to one community versus another. UniFrac can be weighted or unweighted, with the unweighted version focusing only on whether a taxon is present or absent, similar to MPD, but it incorporates a deeper view of the phylogenetic tree.
+> UniFrac and MPD differ in that UniFrac compares entire communities to each other, while MPD focuses on pairwise distances within a single community.
 > ***Answer 4b***: 
+> The plot comparing **Mean Pair Distance (MPD)** and **UniFrac Distance** suggests that the two metrics are generally similar but not identical.  From the scatter plot, we can observe that most points are clustered along the 1:1 line, this means that that the patterns of phylogenetic distance in the two metrics are highly correlated. 
 > ***Answer 4c***:
-
+> MPD tends to show **less variation** than UniFrac because MPD only measures distances between species within the same community. 
+> It treats the species in each community as a fixed set and calculates the average distance between all pairs of species without considering how they relate to other communities.
+> On the other hand, UniFrac compares the entire phylogenetic composition of two communities, and it accounts for how the species in one community relate to the species in another. 
+> This comparison across communities allows UniFrac to capture more complex patterns and more variation, especially when comparing communities that may differ substantially in their phylogenetic compositions.
 
 ### B. Visualizing Phylogenetic Beta-Diversity
 Now that we have our phylogenetically based community resemblance matrix, we can visualize phylogenetic diversity among samples using the same techniques that we used in the $\beta$-diversity module from earlier in the course.

@@ -539,6 +539,7 @@ In the R code chunk below, do the following:
 
 ```{r}
 
+
 # Using the niche breadth data from above
 nb.lake = as.data.frame(as.matrix(nb))
 nb.lake$lake = rep('A')
@@ -643,9 +644,38 @@ If not, why?
 Is there anything you could do differently that would improve your tree, especially with regard to future analyses done by your team?
 
 ```{r}
+# Read and clean the new sequence data
+new_seqs <- readDNAStringSet("data/macrozoob_18SRNA.fasta", format = 'fasta')
+
+# Perform sequence alignment and convert to DNAbin object
+new_alignment <- msaMuscle(new_seqs)
+new_DNAbin <- as.DNAbin(new_alignment)
+
+# Calculate a distance matrix using the Felsenstein 84 substitution model
+new_dist_F84 <- dist.dna(new_DNAbin, model = "F84", pairwise.deletion = FALSE)
+
+# Build a Neighbor Joining Tree with F84 substitution model
+new_nj_tree <- bionj(new_dist_F84)
+
+# Check the tip labels of the tree
+new_nj_tree$tip.label
+
+# Define the outgroup 
+# Find the outgroup position (in this case, "Terebellides stroemii")
+outgroup_pos <- match("AY577893.1 Terebellides stroemii 18S ribosomal RNA gene, partial sequence", new_nj_tree$tip.label)
+
+# Check if outgroup_pos is NA, meaning no match was found
+if (is.na(outgroup_pos)) {
+  stop("Outgroup taxon not found in tree.")
+} else {
+  # Root the tree using the correct outgroup position
+  new_nj_rooted <- root(new_nj_tree, outgroup = outgroup_pos, resolve.root = TRUE)
+}
 
 
-
+# Visualize the rooted tree
+par(mar = c(1, 1, 2, 1) + 0.1)
+plot.phylo(new_nj_rooted, main = "Neighbor Joining Tree (F84)", use.edge.length = FALSE, cex = 0.6, label.offset = 1)
 
 ```
 
